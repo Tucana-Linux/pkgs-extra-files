@@ -1,0 +1,10 @@
+[Unit]
+Description=Bind DNS server
+After=Network.target
+
+[Service]
+ExecStart=/usr/bin/named -f -u named
+ExecReload=/usr/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
