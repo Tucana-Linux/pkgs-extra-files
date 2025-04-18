@@ -1,0 +1,27 @@
+diff --color -Naur calamares-3.3.14/src/modules/packages/main.py calamares-3.3.14-tucana/src/modules/packages/main.py
+--- calamares-3.3.14/src/modules/packages/main.py	2025-02-20 14:06:14.000000000 -0500
++++ calamares-3.3.14-tucana/src/modules/packages/main.py	2025-04-17 20:57:13.956162813 -0400
+@@ -327,6 +327,23 @@
+         check_target_env_call(["dnf5", "-y", "upgrade"])
+ 
+ 
++class PMNeptune(PackageManager):
++   """
++   Tucana New Package Manager
++   """
++   backend="neptune"
++    def install(self, pkgs, from_local=False):
++        check_target_env_call(["neptune", "install", "--y"] + pkgs)
++
++    def remove(self, pkgs):
++        target_env_call(["neptune", "remove --y"] + pkgs)
++
++    def update_db(self):
++        check_target_env_call(["neptune", "sync"] + pkgs)
++
++    def update_system(self):
++        check_target_env_call(["neptune", "update"])
++
+ class PMDummy(PackageManager):
+     backend = "dummy"
+ 
