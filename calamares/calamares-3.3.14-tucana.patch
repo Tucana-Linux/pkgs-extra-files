@@ -9,7 +9,7 @@ diff --color -Naur calamares-3.3.14/src/modules/packages/main.py calamares-3.3.1
 +   """
 +   Tucana New Package Manager
 +   """
-+   backend="neptune"
++    backend="neptune"
 +    def install(self, pkgs, from_local=False):
 +        check_target_env_call(["neptune", "install", "--y"] + pkgs)
 +
