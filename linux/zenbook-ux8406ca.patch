@@ -17,4 +17,192 @@ diff --color -Naur linux-6.14.6/drivers/platform/x86/asus-nb-wmi.c linux-6.14.6-
  	{},
  };
  
+From 2f8f8e6bb2da47c677a07f76f141c527ddd5d51c Mon Sep 17 00:00:00 2001
+From: hacker1024 <hacker1024@users.sourceforge.net>
+Date: Fri, 12 Apr 2024 13:59:24 +1000
+Subject: [PATCH] asus-wmi: Add additional DEVID_THROTTLE_THERMAL_POLICY
 
+---
+ drivers/platform/x86/asus-wmi.c            | 102 +++++++++++++++------
+ include/linux/platform_data/x86/asus-wmi.h |   1 +
+ 2 files changed, 76 insertions(+), 27 deletions(-)
+
+diff --git a/drivers/platform/x86/asus-wmi.c b/drivers/platform/x86/asus-wmi.c
+index 18be35fdb381..c7958b31dae0 100644
+--- a/drivers/platform/x86/asus-wmi.c
++++ b/drivers/platform/x86/asus-wmi.c
+@@ -93,9 +93,13 @@ module_param(fnlock_default, bool, 0444);
+ #define ASUS_FAN_BOOST_MODE_SILENT_MASK                0x02
+ #define ASUS_FAN_BOOST_MODES_MASK              0x03
+ 
++#define ASUS_THROTTLE_THERMAL_POLICY_COUNT 3
+ #define ASUS_THROTTLE_THERMAL_POLICY_DEFAULT   0
+ #define ASUS_THROTTLE_THERMAL_POLICY_OVERBOOST 1
+ #define ASUS_THROTTLE_THERMAL_POLICY_SILENT    2
++#define ASUS_THROTTLE_THERMAL_POLICY_LITE_DEFAULT 0
++#define ASUS_THROTTLE_THERMAL_POLICY_LITE_OVERBOOST 2
++#define ASUS_THROTTLE_THERMAL_POLICY_LITE_SILENT 1
+ 
+ #define USB_INTEL_XUSB2PR              0xD0
+ #define PCI_DEVICE_ID_INTEL_LYNXPOINT_LP_XHCI  0x9c31
+@@ -282,6 +286,7 @@ struct asus_wmi {
+        bool kbd_rgb_state_available;
+ 
+        bool throttle_thermal_policy_available;
++       bool throttle_thermal_policy_lite;
+        u8 throttle_thermal_policy_mode;
+ 
+        bool cpu_fan_curve_available;
+@@ -3404,6 +3409,14 @@ static int throttle_thermal_policy_check_present(struct asus_wmi *asus)
+        err = asus_wmi_get_devstate(asus,
+                                    ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY,
+                                    &result);
++       if (err == -ENODEV) {
++               err = asus_wmi_get_devstate(asus,
++                                               ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY_LITE,
++                                               &result);
++               asus->throttle_thermal_policy_lite = true;
++       } else {
++               asus->throttle_thermal_policy_lite = false;
++       }
+        if (err) {
+                if (err == -ENODEV)
+                        return 0;
+@@ -3424,7 +3437,10 @@ static int throttle_thermal_policy_write(struct asus_wmi *asus)
+ 
+        value = asus->throttle_thermal_policy_mode;
+ 
+-       err = asus_wmi_set_devstate(ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY,
++       err = asus_wmi_set_devstate(
++                                       asus->throttle_thermal_policy_lite
++                                               ? ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY_LITE
++                                               : ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY,
+                                    value, &retval);
+ 
+        sysfs_notify(&asus->platform_device->dev.kobj, NULL,
+@@ -3466,7 +3482,7 @@ static int throttle_thermal_policy_switch_next(struct asus_wmi *asus)
+        u8 new_mode = asus->throttle_thermal_policy_mode + 1;
+        int err;
+ 
+-       if (new_mode > ASUS_THROTTLE_THERMAL_POLICY_SILENT)
++       if (new_mode > ASUS_THROTTLE_THERMAL_POLICY_COUNT - 1)
+                new_mode = ASUS_THROTTLE_THERMAL_POLICY_DEFAULT;
+ 
+        asus->throttle_thermal_policy_mode = new_mode;
+@@ -3505,7 +3521,7 @@ static ssize_t throttle_thermal_policy_store(struct device *dev,
+        if (result < 0)
+                return result;
+ 
+-       if (new_mode > ASUS_THROTTLE_THERMAL_POLICY_SILENT)
++       if (new_mode > ASUS_THROTTLE_THERMAL_POLICY_COUNT - 1)
+                return -EINVAL;
+ 
+        asus->throttle_thermal_policy_mode = new_mode;
+@@ -3536,18 +3552,34 @@ static int asus_wmi_platform_profile_get(struct platform_profile_handler *pprof,
+ 
+        tp = asus->throttle_thermal_policy_mode;
+ 
+-       switch (tp) {
+-       case ASUS_THROTTLE_THERMAL_POLICY_DEFAULT:
+-               *profile = PLATFORM_PROFILE_BALANCED;
+-               break;
+-       case ASUS_THROTTLE_THERMAL_POLICY_OVERBOOST:
+-               *profile = PLATFORM_PROFILE_PERFORMANCE;
+-               break;
+-       case ASUS_THROTTLE_THERMAL_POLICY_SILENT:
+-               *profile = PLATFORM_PROFILE_QUIET;
+-               break;
+-       default:
+-               return -EINVAL;
++       if (!asus->throttle_thermal_policy_lite) {
++               switch (tp) {
++               case ASUS_THROTTLE_THERMAL_POLICY_DEFAULT:
++                       *profile = PLATFORM_PROFILE_BALANCED;
++                       break;
++               case ASUS_THROTTLE_THERMAL_POLICY_OVERBOOST:
++                       *profile = PLATFORM_PROFILE_PERFORMANCE;
++                       break;
++               case ASUS_THROTTLE_THERMAL_POLICY_SILENT:
++                       *profile = PLATFORM_PROFILE_QUIET;
++                       break;
++               default:
++                       return -EINVAL;
++               }
++       } else {
++               switch (tp) {
++               case ASUS_THROTTLE_THERMAL_POLICY_LITE_DEFAULT:
++                       *profile = PLATFORM_PROFILE_BALANCED;
++                       break;
++               case ASUS_THROTTLE_THERMAL_POLICY_LITE_OVERBOOST:
++                       *profile = PLATFORM_PROFILE_PERFORMANCE;
++                       break;
++               case ASUS_THROTTLE_THERMAL_POLICY_LITE_SILENT:
++                       *profile = PLATFORM_PROFILE_QUIET;
++                       break;
++               default:
++                       return -EINVAL;
++               }
+        }
+ 
+        return 0;
+@@ -3561,18 +3593,34 @@ static int asus_wmi_platform_profile_set(struct platform_profile_handler *pprof,
+ 
+        asus = container_of(pprof, struct asus_wmi, platform_profile_handler);
+ 
+-       switch (profile) {
+-       case PLATFORM_PROFILE_PERFORMANCE:
+-               tp = ASUS_THROTTLE_THERMAL_POLICY_OVERBOOST;
+-               break;
+-       case PLATFORM_PROFILE_BALANCED:
+-               tp = ASUS_THROTTLE_THERMAL_POLICY_DEFAULT;
+-               break;
+-       case PLATFORM_PROFILE_QUIET:
+-               tp = ASUS_THROTTLE_THERMAL_POLICY_SILENT;
+-               break;
+-       default:
+-               return -EOPNOTSUPP;
++       if (!asus->throttle_thermal_policy_lite) {
++               switch (profile) {
++               case PLATFORM_PROFILE_PERFORMANCE:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_OVERBOOST;
++                       break;
++               case PLATFORM_PROFILE_BALANCED:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_DEFAULT;
++                       break;
++               case PLATFORM_PROFILE_QUIET:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_SILENT;
++                       break;
++               default:
++                       return -EOPNOTSUPP;
++               }
++       } else {
++               switch (profile) {
++               case PLATFORM_PROFILE_PERFORMANCE:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_LITE_OVERBOOST;
++                       break;
++               case PLATFORM_PROFILE_BALANCED:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_LITE_DEFAULT;
++                       break;
++               case PLATFORM_PROFILE_QUIET:
++                       tp = ASUS_THROTTLE_THERMAL_POLICY_LITE_SILENT;
++                       break;
++               default:
++                       return -EOPNOTSUPP;
++               }
+        }
+ 
+        asus->throttle_thermal_policy_mode = tp;
+diff --git a/include/linux/platform_data/x86/asus-wmi.h b/include/linux/platform_data/x86/asus-wmi.h
+index ab1c7deff118..ddf5b3766cd2 100644
+--- a/include/linux/platform_data/x86/asus-wmi.h
++++ b/include/linux/platform_data/x86/asus-wmi.h
+@@ -64,6 +64,7 @@
+ #define ASUS_WMI_DEVID_SCREENPAD_LIGHT 0x00050032
+ #define ASUS_WMI_DEVID_FAN_BOOST_MODE  0x00110018
+ #define ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY 0x00120075
++#define ASUS_WMI_DEVID_THROTTLE_THERMAL_POLICY_LITE 0x00110019
+ 
+ /* Misc */
+ #define ASUS_WMI_DEVID_PANEL_OD                0x00050019
+-- 
+2.44.0
