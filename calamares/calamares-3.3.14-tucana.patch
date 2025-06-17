@@ -14,7 +14,7 @@ diff --color -Naur calamares-3.3.14/src/modules/packages/main.py calamares-3.3.1
 +        check_target_env_call(["neptune", "install", "--y"] + pkgs)
 +
 +    def remove(self, pkgs):
-+        target_env_call(["neptune", "remove --y"] + pkgs)
++        target_env_call(["neptune", "remove", "--y"] + pkgs)
 +
 +    def update_db(self):
 +        check_target_env_call(["neptune", "sync"] + pkgs)
