@@ -20,7 +20,7 @@ diff --color -Naur calamares-3.3.14/src/modules/packages/main.py calamares-3.3.1
 +        check_target_env_call(["neptune", "sync"] + pkgs)
 +
 +    def update_system(self):
-+        check_target_env_call(["neptune", "update"])
++        check_target_env_call(["neptune", "update", "--y"])
 +
  class PMDummy(PackageManager):
      backend = "dummy"
